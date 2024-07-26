@@ -1,19 +1,35 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import toast, { Toaster } from 'react-hot-toast';
 
-function Header() {
+function Header({ items, setItems }) {
   const [inputText, setInputText] = useState("");
   const [inputTextarea, setInputTextarea] = useState("");
-  const [items, setItems] = useState(() => {
-    const savedItems = localStorage.getItem("notes");
-    return savedItems ? JSON.parse(savedItems) : [];
-  });
   const [selectedItem, setSelectedItem] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editIndex, setEditIndex] = useState(null);
+  const [idCounter, setIdCounter] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
 
+  const location = useLocation();
+  const navigate = useNavigate();
   const popupRef = useRef(null);
+
+  useEffect(() => {
+    if (location.state?.loggedIn) {
+      toast.success('Successfully logged in!');
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    const storedItems = JSON.parse(localStorage.getItem("notes"));
+    if (storedItems) {
+      setItems(storedItems);
+      const maxId = Math.max(...storedItems.map(item => item.id), 0);
+      setIdCounter(maxId + 1);
+    }
+  }, [setItems]);
 
   useEffect(() => {
     localStorage.setItem("notes", JSON.stringify(items));
@@ -47,19 +63,23 @@ function Header() {
       return;
     }
 
+    const newNote = {
+      id: idCounter,
+      inputText,
+      inputTextarea,
+    };
+
     if (isEditing) {
       setItems((prevItems) =>
         prevItems.map((item, index) =>
-          index === editIndex ? { inputText, inputTextarea } : item
+          index === editIndex ? newNote : item
         )
       );
       setIsEditing(false);
       setEditIndex(null);
     } else {
-      setItems((prevItems) => [
-        ...prevItems,
-        { inputText, inputTextarea },
-      ]);
+      setItems((prevItems) => [...prevItems, newNote]);
+      setIdCounter(idCounter + 1);
     }
 
     setInputText("");
@@ -84,21 +104,43 @@ function Header() {
     handleOpenPopup();
   }
 
+  function search(e) {
+    setSearchInput(e.target.value.toLowerCase());
+  }
+
+  const filteredItems = items.filter(item =>
+    item.inputText.toLowerCase().includes(searchInput)
+  );
+
+  const handleLogout = () => {
+    navigate('/login', { state: { loggedout: true } });
+  };
+
   return (
     <div>
-      <h2 className="header" id="full">Notes</h2>
-      <div className="navblock">
-        <Link className="nav" to="/">Home</Link>
-        <Link className="nav nav2" to="/aboutus">About Us</Link>
-      </div>
-      <button onClick={handleOpenPopup} className="btn">+ Add Note</button>
+      <Toaster position='bottom-right' />
+      <h2 className="header" id="full">Notes
+        <div className="navblock">
+          <Link className="nav" to="/">Home</Link>
+          {/* <Link style={{ marginLeft: "200px" }} className="nav" to="/login">Login</Link> */}
+          <input onChange={search} className="search" type="text" placeholder="Search your task..." />
+          <div style={{marginLeft:"1100px", marginTop:"-20px",fontSize:"13px",cursor:"pointer"}}>
+            <p style={{width:"50px"}}>zeel_patel</p>
+            <img src="https://static-00.iconduck.com/assets.00/user-icon-1024x1024-dtzturco.png" alt="user" style={{height:"22px",width:"22px",marginLeft:"70px",marginTop:"-18px",position:"absolute"}} />
+          </div>
+          <button onClick={handleLogout} className="nav" style={{ fontSize: "13px", float: "right", marginLeft: "1250px",marginTop:"-18px", border: "none", background: "none", cursor: "pointer" }}>
+          <b><b>Logout</b> </b> 
+          </button>
+        </div>
+      </h2>
+      <button onClick={handleOpenPopup} className="btn">+</button>
 
       {showPopup && (
         <div className="modal-overlay2" onClick={handleClosePopup}>
           <div className="modal-content2" ref={popupRef} onClick={(e) => e.stopPropagation()}>
             <button className="exp" onClick={handleClosePopup}>X</button>
             <form onSubmit={addItem}>
-              <textarea
+              <input
                 placeholder="Title"
                 name="title"
                 className="form1"
@@ -108,7 +150,7 @@ function Header() {
                 required
               />
               <br />
-              <textarea
+              <input
                 className="form1"
                 name="content"
                 placeholder="Take a note..."
@@ -119,13 +161,12 @@ function Header() {
               />
               <br />
               <button className="btn3" type="submit">
-                {isEditing ? "Update" : "Add"}
+                {isEditing ? "Edit" : "Add"}
               </button>
             </form>
           </div>
         </div>
       )}
-
       {selectedItem && (
         <div className="modal-overlay" onClick={handleClosePopup}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -135,12 +176,11 @@ function Header() {
           </div>
         </div>
       )}
-
-      {items.map((todoItem, index) => (
-        <div className="content" key={index} id="full">
+      {filteredItems.map((todoItem, index) => (
+        <div className="content" key={todoItem.id} id="full">
           <div className="d">
             <button onClick={() => deleteItem(index)} style={{ border: "none", cursor: "pointer" }}>
-              <i className="fa fa-trash" aria-hidden="true"></i>
+              <i className="fa fa-trash" aria-hidden="false"></i>
             </button>
           </div>
           <div className="e">
@@ -148,7 +188,9 @@ function Header() {
               <i style={{ marginLeft: "-140px" }} className="fas fa-edit"></i>
             </button>
           </div>
-          <h1 className="title">{todoItem.inputText}</h1>
+          <Link style={{ textDecoration: "none" }} to={`/note/${todoItem.id}`}>
+            <h1 key={todoItem.id} className="title">{todoItem.inputText}</h1>
+          </Link>
           <h3 className="decscription">{todoItem.inputTextarea}</h3>
           <div id="txt">
             <b style={{ backgroundColor: "rgb(250, 241, 241)", marginTop: "-40px" }}>{len(todoItem.inputTextarea)}</b>
